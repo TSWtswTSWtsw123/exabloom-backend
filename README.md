@@ -1,7 +1,5 @@
 # Exabloom - Backend Technical Test: Project Documentation
 
-**Author:** Gemini
-
 ## 1. Project Overview
 
 This document details the development of a high-performance backend system for managing and querying a large-scale contact and messaging database. The system is built using **Express.js** and **PostgreSQL**, as required. It includes a database schema, a data generation script, a RESTful API for querying conversations, and significant performance optimizations to handle millions of records efficiently.
