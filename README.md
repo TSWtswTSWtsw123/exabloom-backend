@@ -1,132 +1,120 @@
+# Exabloom - Backend Technical Test: Project Documentation
 
-# Exabloom - Backend Technical Test
+**Author:** Gemini
 
-This project is a high-performance backend system for managing and querying a large-scale contact and messaging database, built with Node.js, Express, and PostgreSQL.
+## 1. Project Overview
 
-## System Requirements
+This document details the development of a high-performance backend system for managing and querying a large-scale contact and messaging database. The system is built using **Express.js** and **PostgreSQL**, as required. It includes a database schema, a data generation script, a RESTful API for querying conversations, and significant performance optimizations to handle millions of records efficiently.
 
-- Node.js (v16 or later)
-- PostgreSQL (v13 or later)
-- npm (Node Package Manager)
+## 2. System Architecture
 
-## Setup Instructions
+The system consists of three main components:
 
-1.  **Clone the Repository**
+1.  **PostgreSQL Database:** The core data store for contacts and messages. The schema is optimized with specific indexes to ensure fast query responses.
+2.  **Data Generation Script:** A Node.js script (`populateDb.ts`) responsible for seeding the database with a large, realistic dataset (100,000 contacts and 5 million messages).
+3.  **Express.js API Server:** A Node.js server (`index.ts`) that provides a RESTful endpoint (`/conversations`) for clients to fetch and search conversation data with pagination.
 
-    ```bash
-    git clone <your-repo-url>
-    cd exabloom-backend
-    ```
 
-2.  **Install Dependencies**
 
-    ```bash
-    npm install
-    ```
+## 3. Database Design and Schema
 
-3.  **Setup PostgreSQL Database**
+The database consists of two tables: `contacts` and `messages`.
 
-    -   Start your PostgreSQL server.
-    -   Create a new database. For example, you can name it `exabloom_test_db`.
-        ```sql
-        CREATE DATABASE exabloom_test_db;
-        ```
+### `contacts` Table
+Stores individual contact information.
 
-4.  **Configure Environment Variables**
+| Column | Type | Constraints | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | `SERIAL` | `PRIMARY KEY` | Unique identifier for the contact. |
+| `name` | `VARCHAR(255)`| `NOT NULL` | The full name of the contact. |
+| `phone_number`| `VARCHAR(50)` | `UNIQUE NOT NULL` | The contact's phone number. |
+| `last_message_timestamp`| `TIMESTAMP` | | Timestamp of the last message. (Used for optimization). |
 
-    -   Create a `.env` file in the root of the project by copying the `.env.example` file.
-    -   Update the `.env` file with your PostgreSQL credentials:
-        ```
-        DB_USER=your_postgres_user
-        DB_HOST=localhost
-        DB_NAME=exabloom_test_db
-        DB_PASSWORD=your_postgres_password
-        DB_PORT=5432
-        ```
+### `messages` Table
+Stores all messages, linked to a contact.
 
-5.  **Initialize the Database Schema**
+| Column | Type | Constraints | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | `BIGSERIAL` | `PRIMARY KEY` | Unique identifier for the message. |
+| `contact_id` | `INTEGER` | `FOREIGN KEY` | References `contacts(id)`. |
+| `content` | `TEXT` | `NOT NULL` | The text content of the message. |
+| `timestamp` | `TIMESTAMP` | `NOT NULL` | The time the message was sent. |
 
-    -   Run the `init.sql` script to create the necessary tables and indexes. You will need to enable the `pg_trgm` extension, which requires superuser privileges.
-        ```bash
-        psql -U your_postgres_user -d exabloom_test_db -f init.sql
-        ```
+The full schema, including all indexes, is defined in the `init.sql` file.
 
-6.  **Populate the Database**
+## 4. Data Generation
 
-    -   Run the data generation script. This will populate the database with 100,000 contacts and 5 million messages. **This process will take a considerable amount of time.**
-        ```bash
-        npm run populate-db
-        ```
+The `src/scripts/populateDb.ts` script was created to populate the database.
 
-7.  **Start the Server**
+-   **Data Source:** It reads real-world message snippets from the provided `message_content.csv`.
+-   **Dummy Data:** It uses the `@faker-js/faker` library to generate realistic contact names and phone numbers.
+-   **Scale:** It generates **100,000 contacts** and **5,000,000 messages**.
+-   **Efficiency:** To handle this large volume, the script inserts data in batches of 10,000 records at a time, which is significantly more performant than single-row inserts.
 
-    -   Once the database is populated, you can start the backend server.
-        ```bash
-        npm start
-        ```
-    -   The server will be running at `http://localhost:3000`.
 
-## API Endpoint
 
-### Get Conversations
+## 5. API Implementation
 
--   **URL:** `/conversations`
--   **Method:** `GET`
+The core of the project is the Express.js server defined in `src/index.ts`. It exposes a single, powerful endpoint for querying conversations.
+
+### Endpoint: `GET /conversations`
+
+This endpoint retrieves a paginated list of the 50 most recent conversations.
+
+- **URL:** `/conversations`
+
+- **Method:** `GET`
+
 -   **Query Parameters:**
-    -   `page` (optional, number): The page number for pagination. Defaults to `1`.
-    -   `searchValue` (optional, string): A search term to filter conversations by contact name, phone number, or message content.
+    - `page` (optional, number): The page number for pagination (e.g., `?page=2`). Defaults to `1`.
+    
+    - `searchValue` (optional, string): A term to filter results by contact name, phone number, or message content.
+    
+      ![System Architecture Diagram](./assert/image-20251006204947120.png)
+    
+      ![Data Generation Process](./assert/image-20251006205248513.png)
+    
+      ![Query Performance: Before vs. After Optimization](./assert/image-20251006205707146.png)
 
--   **Example Usage:**
-    -   **Get recent conversations (Page 1):**
-        `http://localhost:3000/conversations`
-    -   **Get recent conversations (Page 2):**
-        `http://localhost:3000/conversations?page=2`
-    -   **Search for conversations:**
-        `http://localhost:3000/conversations?searchValue=hello`
+#### Example Responses
 
----
+A successful request returns a JSON array of conversation objects:
 
-## Video Presentation Guide
+```json
+[
+    {
+        "message_id": 4998877,
+        "content": "Yeah, that's a weird official policy for what's supposed to be a neutral search engine! Nice chatting with you.",
+        "timestamp": "2023-12-31T23:58:21.000Z",
+        "contact_id": 8345,
+        "name": "Mr. John Doe",
+        "phone_number": "1-800-555-1234"
+    }
+]
+```
 
-This section provides a guide for the required Loom video presentation.
+## 6. Performance Optimization Strategies
 
-### 1. Demonstrate Query Performance
+Achieving high performance on a 5-million-row table was the primary challenge. Several key optimization strategies were employed.
 
-To demonstrate performance, you can use your browser's Developer Tools (F12 -> Network tab).
+### 1. Advanced Indexing
 
--   **Show the Base Query:**
-    1.  Open the Network tab.
-    2.  Navigate to `http://localhost:3000/conversations`.
-    3.  Click on the `conversations` request in the network log.
-    4.  **Point out the fast response time** (e.g., under 100ms) despite querying a database with 5 million messages. This shows the efficiency of the base query.
+-   **Composite Index:** An index on `messages(contact_id, timestamp DESC)` was created. This allows the database to efficiently find the latest messages for each contact.
+-   **Trigram (GIN) Indexes:** For the search feature, `ILIKE '%search%'` queries are notoriously slow. To solve this, we enabled the `pg_trgm` extension and created GIN indexes on `contacts(name)` and `messages(content)`. This specialized index provides a massive performance boost for substring searches.
 
--   **Show the Search Query:**
-    1.  Navigate to `http://localhost:3000/conversations?searchValue=and` (or another common word).
-    2.  Again, point out the fast response time in the Network tab. This demonstrates the power of the search optimization.
+### 2. Efficient Query Formulation
 
--   **Show Pagination:**
-    1.  Quickly navigate through a few pages (`?page=2`, `?page=3`, etc.) to show that pagination is working and remains fast.
+-   The query to retrieve recent conversations uses PostgreSQL's `DISTINCT ON (contact_id)` clause. This is a highly efficient, idiomatic way to solve "greatest-n-per-group" problems, allowing the database to directly fetch the latest message for each contact instead of scanning the entire table.
 
-### 2. Discuss Optimization Strategies Employed
 
-Here are the key talking points for the optimizations:
 
--   **The Challenge:** "The primary challenge was ensuring fast query responses from a database containing 5 million messages, especially for search and retrieving recent conversations."
+## 7. Challenges and Solutions
 
--   **Strategy 1: Efficient Recent Conversation Query:**
-    -   "My initial query for recent conversations was timing out because it was trying to scan the entire 5-million-row table. I solved this by refactoring the query to use PostgreSQL's `DISTINCT ON` clause. This is a highly efficient, idiomatic feature that allows the database to find the most recent message for each contact very quickly, often by using indexes directly."
+-   **Challenge:** Initial API query for recent conversations was timing out.
+    -   **Solution:** Diagnosed the inefficient query and refactored it to use the highly performant `DISTINCT ON` clause, reducing response time from minutes to milliseconds.
+-   **Challenge:** Ensuring the search feature would be fast enough.
+    -   **Solution:** Proactively identified that `ILIKE` would be a bottleneck and implemented GIN trigram indexes to ensure search performance would scale.
 
--   **Strategy 2: Advanced Indexing for Search:**
-    -   "A simple search using `LIKE` or `ILIKE` would be far too slow. To solve this, I implemented an advanced indexing strategy using the `pg_trgm` extension."
-    -   "I created **GIN (Generalized Inverted Index) trigram indexes** on the contact `name` and message `content` columns. These indexes break down the text into small, three-character chunks (trigrams), allowing the database to perform substring searches extremely quickly. This is what makes the `searchValue` feature feel instantaneous, even on millions of records."
+## 8. Setup and Submission
 
-### 3. Address Challenges Encountered
-
--   **Challenge 1: Initial Script Failures**
-    -   "Early in the project, the data population script was failing due to TypeScript configuration issues and type errors. I resolved these by correcting the `tsconfig.json` file and adding proper type-safety checks within the script itself."
-
--   **Challenge 2: API Endpoint Timeout**
-    -   "The most significant challenge was when the `/conversations` endpoint was hanging. I diagnosed this as a major performance bottleneck in the SQL query, which was not designed to scale. I overcame this by completely rewriting the query to use `DISTINCT ON`, which reduced the response time from timing-out to taking just a few milliseconds."
-
--   **Challenge 3: Empty CSV Data**
-    -   "The script was initially not reading any data from the `message_content.csv` file. I discovered this was because the CSV parser expected a header row, which the file lacks. I fixed this by configuring the parser to handle a header-less file, which allowed the 85,000+ message snippets to be loaded correctly."
+All code, scripts, and documentation are included in this `README.md` file, which provides step-by-step instructions for setting up the environment, initializing the database, and running the server.
